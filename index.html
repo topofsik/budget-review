@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>협력사업 예산 심사</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1f2937; --muted: #6b7280;
+    --line: #e5e7eb; --ok: #15803d; --ok-bg: #dcfce7; --no: #b91c1c; --no-bg: #fee2e2;
+    --accent: #1e3a8a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 6px; color: var(--accent); }
+  .rule { color: var(--muted); font-size: .9rem; margin: 0 0 24px; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .box .label { font-size: .85rem; color: var(--muted); }
+  .box .value { font-size: 1.6rem; font-weight: 700; margin-top: 4px; }
+  .box.ok .value { color: var(--ok); }
+  .box.no .value { color: var(--no); }
+  .table-wrap { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 520px; }
+  th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  th { background: #f9fafb; font-size: .85rem; color: var(--muted); text-align: center; }
+  td { text-align: right; font-variant-numeric: tabular-nums; }
+  td:first-child, td:last-child { text-align: center; }
+  tr:last-child td { border-bottom: none; }
+  tr.reject td { background: #fff7f7; }
+  .badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: .85rem; }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); }
+  .badge.no { color: var(--no); background: var(--no-bg); }
+  .err { color: var(--no); margin-top: 12px; font-size: .9rem; }
+  @media (max-width: 560px) { .summary { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>지자체 협력사업 예산 심사 결과</h1>
+  <p class="rule">심사 규칙: 한도액 = 인구수 × 10 / 신청액 &gt; 한도액 → <b>반려</b>, 신청액 ≤ 한도액 → <b>승인</b></p>
+
+  <div class="summary">
+    <div class="box ok"><div class="label">승인 건수</div><div class="value" id="approveCount">-</div></div>
+    <div class="box no"><div class="label">반려 건수</div><div class="value" id="rejectCount">-</div></div>
+    <div class="box"><div class="label">승인 신청액 합계</div><div class="value" id="approveSum">-</div></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>지자체명</th><th>인구수</th><th>신청액</th><th>한도액</th><th>판정</th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <p class="err" id="msg"></p>
+</div>
+
+<script>
+  // 심사 규칙
+  const LIMIT_RATE = 10;
+  const judge = (item) => {
+    const limit = item.인구수 * LIMIT_RATE;
+    return { ...item, 한도액: limit, 판정: item.신청액 > limit ? "반려" : "승인" };
+  };
+  const fmt = (n) => n.toLocaleString("ko-KR");
+
+  function render(list) {
+    const rows = list.map(judge);
+    document.getElementById("tbody").innerHTML = rows.map(r => `
+      <tr class="${r.판정 === "반려" ? "reject" : ""}">
+        <td>${r.지자체명}</td>
+        <td>${fmt(r.인구수)}</td>
+        <td>${fmt(r.신청액)}</td>
+        <td>${fmt(r.한도액)}</td>
+        <td><span class="badge ${r.판정 === "승인" ? "ok" : "no"}">${r.판정}</span></td>
+      </tr>`).join("");
+
+    const approved = rows.filter(r => r.판정 === "승인");
+    document.getElementById("approveCount").textContent = approved.length + "건";
+    document.getElementById("rejectCount").textContent = (rows.length - approved.length) + "건";
+    document.getElementById("approveSum").textContent = fmt(approved.reduce((s, r) => s + r.신청액, 0));
+  }
+
+  // 페이지 로드 시 신청목록.json 읽기
+  fetch(encodeURI("신청목록.json"))
+    .then(res => { if (!res.ok) throw new Error(res.status); return res.json(); })
+    .then(render)
+    .catch(err => {
+      document.getElementById("msg").textContent =
+        "신청목록.json을 불러오지 못했습니다(" + err.message + "). index.html과 같은 폴더에 있는지 확인하세요.";
+    });
+</script>
+</body>
+</html>
